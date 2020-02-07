@@ -1,0 +1,2264 @@
+import java.util.ArrayList;
+import java.util.Arrays;
+import tester.*;
+import javalib.impworld.*;
+import java.awt.Color;
+import javalib.worldimages.*;
+import java.util.Random;
+import java.util.HashMap;
+
+// to represent a singular game piece in the LightEmAll game
+class GamePiece {
+  // in logical coordinates, with the origin
+  // at the top-left corner of the screen
+  int row;
+  int col;
+  // whether this GamePiece is connected to the
+  // adjacent left, right, top, or bottom pieces
+  boolean left;
+  boolean right;
+  boolean top;
+  boolean bottom;
+  // whether the power station is on this piece
+  boolean powerStation;
+  // whether or not this gamePiece has been lit up / connected to the powerStation
+  boolean isLit;
+  // whether or not this gamePiece has been connected to the powerStation, but is further away
+  // from the power
+  boolean isSemiLit;
+  // whether or not this gamePiece has been connected to the powerStation, but is quite far away
+  // from the power
+  boolean barelyLit;
+  // the random generator for this game piece
+  Random random;
+
+
+  // constructor for a game piece
+  GamePiece(int row, int col, boolean left, boolean right, boolean top, boolean bottom,
+      boolean powerStation, boolean isLit) {
+    this.row = row;
+    this.col = col;
+    this.left = left;
+    this.right = right;
+    this.top = top;
+    this.bottom = bottom;
+    this.powerStation = powerStation;
+    this.isLit = isLit;
+    this.isSemiLit = false;
+    this.barelyLit = false;
+    this.random = new Random();
+  }
+
+  // constructor for a gamePiece that sets all the fields to default values
+  // besides the piece's logical coordinates
+  GamePiece(int row, int col) {
+    this.left = false;
+    this.right = false;
+    this.top = false;
+    this.bottom = false;
+    this.powerStation = false;
+    this.row = row;
+    this.col = col;
+    this.isLit = false;
+    this.random = new Random();
+  }
+
+  // empty constructor
+  GamePiece() {
+    this.random = new Random();
+  }
+
+
+  // returns a world image of this gamePiece, using the given coordinates, according to the
+  // indicators of which wires / colors should be represented in the gamePiece
+  public WorldImage placeAt(int row, int col) {
+    WorldImage wire = new LineImage(new Posn(0, row / 2), Color.GRAY).movePinhole(0, -row / 4);
+
+    if (this.isLit) {
+      wire = new LineImage(new Posn(0, row / 2), Color.YELLOW).movePinhole(0, -row / 4);
+    }
+
+    else if (this.isSemiLit) {
+      wire = new LineImage(new Posn(0, row / 2), Color.CYAN).movePinhole(0, -row / 4);
+    }
+
+    else if (this.barelyLit) {
+      wire = new LineImage(new Posn(0, row / 2), Color.BLUE).movePinhole(0, -row / 4);
+    }
+    WorldImage tile = new RectangleImage(row, col, OutlineMode.OUTLINE, Color.black);
+
+    if (this.left) {
+      WorldImage leftPiece = new RotateImage(wire, 90);
+      tile = new OverlayImage(leftPiece, tile);
+    }
+
+    if (this.right) {
+      WorldImage rightPiece = new RotateImage(wire, 270);
+      tile = new OverlayImage(rightPiece, tile);
+    }
+
+    if (this.top) {
+      WorldImage topPiece = new RotateImage(wire, 180);
+      tile = new OverlayImage(topPiece, tile);
+    }
+
+    if (this.bottom) {
+      tile = new OverlayImage(wire, tile);
+    }
+
+    if (this.powerStation) {
+      WorldImage power = new StarImage(row / 2 , OutlineMode.SOLID, Color.BLUE);
+      tile = new OverlayImage(power, tile);
+    }
+
+    return tile;
+  }
+
+  // rotates this gamePiece in a clockwise motion
+  public void rotate() {
+    Boolean temp = this.left;
+
+    this.left = this.bottom;
+    this.bottom = this.right;
+    this.right = this.top;
+    this.top = temp;
+  }
+
+  // clears this game Piece's boolean indicator fields, setting them to default values (false)
+  public void clearAll() {
+    this.left = false;
+    this.right = false;
+    this.top = false;
+    this.bottom = false;
+    this.isLit = false;
+    this.isSemiLit = false;
+    this.barelyLit = false;
+    this.powerStation = false;
+  }
+
+  // returns the boolean value of the field corresponding to the given mapping number
+  boolean getConnectorFromNumMapping(int mappingNum) {
+    if (mappingNum == 0) {
+      return this.top;
+    } 
+    else if (mappingNum == 1) {
+      return this.bottom;
+    } 
+    else if (mappingNum == 2) {
+      return this.left;
+    } 
+    else if (mappingNum == 3) {
+      return this.right;
+    }
+
+    // otherwise, mapping number not useful, return false
+    return false;
+  }
+
+  // makes the given gamePiece have the powerStation now, and removes it from this gamePiece
+  public void makeNewPowerStation(GamePiece other) {
+    this.powerStation = false;
+    other.powerStation = true;
+  }
+
+  // makes it so that the gamePiece's indicator of being connected to the left is true
+  public void hasLeftNow() {
+    this.left = true;
+  }
+
+  // makes it so that the gamePiece's indicator of being connected to the right is true
+  public void hasRightNow() {
+    this.right = true;
+  }
+
+  // makes it so that the gamePiece's indicator of being connected to the bottom is true
+  public void hasBottomNow() {
+    this.bottom = true;
+  }
+
+  // makes it so that the gamePiece's indicator of being connected to the top is true
+  public void hasTopNow() {
+    this.top = true;
+  }
+
+  // makes it so that the given piece now has the power station
+  public void hasPowerStation() {
+    this.powerStation = true;
+  }
+
+  // changes the pieces indicator of being lit / connected to the power to true
+  public void makePowered() {
+    this.isLit = true;
+  }
+
+  // changes the pieces indicator of being semi-lit/ connected to the power to true
+  public void makeSemiPowered() {
+    this.isSemiLit = true;
+  }
+
+  // changes the pieces indicator of being barely lit/ connected to the power to true
+  public void makeBarelyPowered() {
+    this.barelyLit = true;
+  }
+
+  // changes the piece's indicator of being lit / connected to the power to false
+  public void makeUnPowered() {
+    this.isLit = false;
+    this.isSemiLit = false;
+    this.barelyLit = false;
+  }
+
+  // returns true if this gamePiece is exactly the same as the given piece
+  boolean sameGamePiece(GamePiece other) {
+    Boolean sameRow = this.row == other.row;
+    Boolean sameCol = this.col == other.col;
+    Boolean sameLeft = this.left == other.left;
+    Boolean sameRight = this.right == other.right;
+    Boolean sameTop = this.top == other.top;
+    Boolean sameBottom = this.bottom == other.bottom;
+    Boolean samePW = this.powerStation == other.powerStation;
+    Boolean sameLit = this.isLit == other.isLit;
+    Boolean sameSemiLit = this.isSemiLit == other.isSemiLit;
+    Boolean sameBarelyLit = this.barelyLit == other.barelyLit;
+
+    return sameRow && sameCol && sameLeft && sameRight && sameTop && sameBottom 
+        && samePW && sameLit && sameSemiLit && sameBarelyLit;
+  }
+
+  // rotates this game piece a random amount, in order to shuffle this game piece
+  public void rotateRandomAmount() {
+    int a = this.random.nextInt(4);
+
+    while (a > 0) {
+      this.rotate();
+      a--;
+    }
+  }
+
+
+}
+
+
+// represents the lightEmAll game world
+class LightEmAll extends World {
+  // a list of columns of GamePieces,
+  // i.e., represents the board in column-major order
+  ArrayList<ArrayList<GamePiece>> board;
+  // a list of all nodes
+  ArrayList<GamePiece> nodes;
+  // a list of edges of the minimum spanning tree
+  ArrayList<Edge> mst;
+  // the width and height of the board
+  int width;
+  int height;
+  // the current location of the power station,
+  // as well as its effective radius
+  int powerRow;
+  int powerCol;
+  int radius;
+  // a counter for the time taken in the game
+  int counter;
+  // a counter for the amount of clicks taken in the game
+  int mouseClick;
+
+  static final int GAME_WIDTH = 600; // the actual width of the LightEmAll game
+  static final int GAME_HEIGHT = 600; // the actual height of the LightEmAll game
+
+
+  // constructor for the lightEmAll game that only takes in the dimensions of the game, and
+  // initializes the world -- actually used for the big bang
+  LightEmAll(int width, int height) {
+    this.width = width;
+    this.height = height;
+    this.powerCol = 0;
+    this.powerRow = 0;
+    this.mst = new ArrayList<Edge>();
+    this.nodes = new ArrayList<GamePiece>();
+    this.createBoard();
+    this.setNodesForGame();
+    this.kruskalBoard();
+    this.setRadiusToGraphDiameter();
+    this.shuffle();
+    this.counter = 0;
+    this.mouseClick = 0;
+  }
+
+  // constructor for the lightEmAll game used for testing purposes
+  LightEmAll(int width, int height, int mouseClick) {
+    this.width = width;
+    this.height = height;
+    this.powerCol = 0;
+    this.powerRow = 0;
+    this.mst = new ArrayList<Edge>();
+    this.nodes = new ArrayList<GamePiece>();
+    this.createBoard();
+    this.setNodesForGame();
+    this.kruskalBoard();
+    this.setRadiusToGraphDiameter();
+    this.counter = 0;
+    this.mouseClick = mouseClick;
+  }
+
+  // lightEmAll constructor for tests
+  LightEmAll(int width, int height, int powerRow, int powerCol, int radius) {
+    this.width = width;
+    this.height = height;
+    this.powerRow = powerRow;
+    this.powerCol = powerCol;
+    this.radius = radius;
+
+
+  }
+
+  // changes the board of the game to a new 2d array based on its number of rows and columns
+  // and initializes the powerStation so that it is in the top left corner
+  public void createBoard() {
+    ArrayList<ArrayList<GamePiece>> temp = new ArrayList<ArrayList<GamePiece>>();
+    for (int rowCount = 0; rowCount < this.width; rowCount++) {
+      ArrayList<GamePiece> currRow = new ArrayList<GamePiece>();
+      for (int colCount = 0; colCount < this.height; colCount++) {
+        currRow.add(new GamePiece(colCount, rowCount));
+      }
+      temp.add(currRow);
+    }
+    this.board = temp;
+
+  }
+
+  // returns the gamePiece at the given x and y coordinates in the 2D array
+  GamePiece getCorrespondingPiece(int i, int j) {
+    return this.board.get(i).get(j);
+
+  }
+
+  // shuffles all of the gamePieces in the board of the lightEmAll game so that it does not
+  // start out in the winning position
+  public void shuffle() {
+    for (int i = 0; i < this.width; i ++) {
+      for (int j = 0; j < this.height; j++) {
+        this.board.get(i).get(j).rotateRandomAmount();
+      }
+    }
+  }
+
+  // sets the list of nodes in the lightEmAll game to be every gamePiece in the game
+  public void setNodesForGame() {
+    for (int i = 0; i < this.width; i++) {
+      for (int j = 0; j < this.height; j++) {
+        this.nodes.add(this.getCorrespondingPiece(i, j));
+      }
+    }
+  }
+
+  // makes use of Kruskal's algorithm to generate the connections of the lightEmAll game
+  public void kruskalBoard() {
+
+    ArrayList<Edge> edgeWorkList = this.constructEdgeList();
+
+    this.heapSort(edgeWorkList); 
+    this.minimumSpanningTree(edgeWorkList);
+
+    // Boolean test = false;
+    for (int i = 0; i < this.mst.size(); i++) {
+      this.connectEdgePieces(this.mst.get(i));
+      // test = true;
+    }
+
+
+    //System.out.print(test);
+    // sets the powerStation to be in the top left corner of the game
+    this.getCorrespondingPiece(this.powerCol, this.powerRow).hasPowerStation();
+
+  }
+
+  // changes the indicators of the two gamePieces of the given edge so that the to and
+  // from node gamePieces in the edge will be connected
+  public void connectEdgePieces(Edge edge) {
+
+    // if the two nodes should be connected from top to bottom, make it so
+    if (edge.fromNode.col == edge.toNode.col) {
+      edge.fromNode.hasBottomNow();
+      edge.toNode.hasTopNow();
+    }
+
+
+
+    // if the two nodes should be connected from left to right, make it so
+    if (edge.fromNode.row == edge.toNode.row) {
+      edge.fromNode.hasRightNow();
+      edge.toNode.hasLeftNow();
+    }
+
+    //    if(edge.fromNode.left == edge.toNode.left) {
+    //      edge.fromNode.hasLeftNow();
+    //      edge.toNode.hasRightNow();
+    //    }
+
+
+  }
+
+  // swaps the two edges at the given indices in the given array list of edges
+  void swapEdges(ArrayList<Edge> arr, int i, int j) {
+    //    System.out.print("a");
+    Edge oldVal = arr.get(i);
+    arr.set(i, arr.get(j));
+    arr.set(j, oldVal);
+  }
+
+  // returns true if the given coordinate values exist within the board of the lightEmAll game
+  boolean checkWithinBoundaries(int x, int y) {
+    return x < this.width && x >= 0 && y < this.height && y >= 0;
+  }
+
+  // draws all of the gamePieces for the game by drawing and placing all gamePieces
+  // based on the given coordinates and the given background to change
+  public WorldScene drawAllGrids(int x, int y, WorldScene background) {
+    GamePiece powerStation = this.getCorrespondingPiece(this.powerCol, this.powerRow);
+    for (int i = 0; i < this.width; i++) {
+      for (int j = 0; j < this.height; j++) {
+        int dist = this.bfsCountsDepth(powerStation,
+            this.getCorrespondingPiece(i, j), new ArrayList<GamePiece>());
+
+        if (dist > -1 && dist <= this.radius - 5) {
+          this.getCorrespondingPiece(i, j).makePowered();
+        }
+
+        else if (dist > -1 && dist <= this.radius - 3) {
+          this.getCorrespondingPiece(i, j).makeSemiPowered();
+        }
+
+        else if (dist > -1 && dist <= this.radius) {
+          this.getCorrespondingPiece(i, j).makeBarelyPowered();
+        }
+
+
+        background.placeImageXY(this.getCorrespondingPiece(i, j).placeAt(x, y),
+            x / 2 + (i * x), y / 2 + (j * y));
+      }      
+    }
+    return background;
+  }
+
+  // handles mouse input - rotates the piece according to the given Posn when the mouse is clicked
+  public void onMouseClicked(Posn pos) {
+
+    int xPlacement = LightEmAll.GAME_HEIGHT / this.width;
+    int yPlacement = LightEmAll.GAME_WIDTH / this.height;
+
+    this.board.get(pos.x / xPlacement).get(pos.y / yPlacement).rotate();
+    mouseClick++;
+
+    for (int i = 0; i < this.width; i++) {
+      for (int n = 0; n < this.height; n++) {
+
+        //so when a lighted piece is clicked, it will make it unpowered if not connected
+        this.getCorrespondingPiece(i, n).makeUnPowered();
+
+      }
+    }
+  }
+
+  // updates the counter for the amount of time the user has taken in the game
+  public void onTick() {
+    this.counter ++;
+  }
+
+  // outputs the scene of the lightEmAll game world
+  public WorldScene makeScene() {
+    WorldScene scene = this.getEmptyScene();
+    int xPlacement = LightEmAll.GAME_HEIGHT / this.width;
+    int yPlacement = LightEmAll.GAME_WIDTH / this.height;
+
+    WorldImage time = new TextImage("Time:" + Integer.toString(this.counter), 25, Color.BLACK);
+    WorldImage score = new TextImage("Clicks:" + Integer.toString(this.mouseClick),
+        25, Color.BLACK);
+    WorldImage restart = new TextImage("Click 'r' to restart the game", 25, Color.BLACK);
+
+    scene.placeImageXY(
+        new RectangleImage(LightEmAll.GAME_WIDTH, LightEmAll.GAME_HEIGHT,
+            OutlineMode.SOLID, Color.DARK_GRAY),
+        LightEmAll.GAME_WIDTH / 2, LightEmAll.GAME_HEIGHT / 2);
+
+    scene = this.drawAllGrids(xPlacement, yPlacement, scene);
+    scene.placeImageXY(time, 400,675);
+    scene.placeImageXY(score, 200, 675);
+    scene.placeImageXY(restart, 300, 650);
+    return scene;
+  }
+
+  // clears all of the pieces of the game board, setting their boolean indicator fields all
+  // to the default value of false
+  public void clearBoard() {
+    for (int i = 0; i < this.width; i ++) {
+      for (int j = 0; j < this.height; j++) {
+        this.getCorrespondingPiece(i, j).clearAll();
+      }
+    }
+  }
+
+  // Moves the power station if the piece is connected in that direction
+  public void onKeyEvent(String key) {
+    GamePiece powerStation = this.board.get(this.powerCol).get(this.powerRow);
+
+    if (key.equals("up")) {
+      if (this.powerRow - 1 >= 0 && powerStation.top 
+          && this.getCorrespondingPiece(this.powerCol, this.powerRow - 1).bottom) {
+        powerStation.makeNewPowerStation(this.board.get(this.powerCol).get(this.powerRow - 1));
+        this.powerRow = this.powerRow - 1;
+      }
+      return ;
+    } 
+    else if (key.equals("down")) {
+      if (this.powerRow + 1 < this.height && powerStation.bottom 
+          && this.getCorrespondingPiece(this.powerCol, this.powerRow + 1).top) {
+        powerStation.makeNewPowerStation(this.board.get(this.powerCol).get(this.powerRow + 1));
+        this.powerRow = this.powerRow + 1;
+      }
+      return ;
+    }
+
+    else  if (key.equals("right")) {
+      if (this.powerCol + 1 < this.width && powerStation.right
+          && this.getCorrespondingPiece(this.powerCol + 1, this.powerRow).left) {
+        powerStation.makeNewPowerStation(this.board.get(this.powerCol + 1).get(this.powerRow));
+        this.powerCol = this.powerCol + 1;
+      }
+      return ;
+    } 
+    else if (key.equals("left")) {
+      if (this.powerCol - 1 >= 0 && powerStation.left
+          && this.getCorrespondingPiece(this.powerCol - 1, this.powerRow).right) {
+        powerStation.makeNewPowerStation(this.board.get(this.powerCol - 1).get(this.powerRow));
+        this.powerCol = this.powerCol - 1;
+      }
+      return ;
+    }
+
+    else if (key.equals("r")) {
+      this.counter = 0;
+      this.mouseClick = 0;
+      this.clearBoard();
+      this.powerCol = 0;
+      this.powerRow = 0;
+      this.kruskalBoard();
+      this.shuffle();
+    }
+  }
+
+  // returns a full list of all of the connected pieces to the given gamePiece,
+  // by accumulating all of the visited / connected pieces from the given piece
+  ArrayList<GamePiece> connectedGamePieces(GamePiece gP, ArrayList<GamePiece> accumulated) {
+    ArrayList<GamePiece> connections = new ArrayList<>();
+
+    // positions to add to coordinates in order to go in all four directions in the board
+    Posn goLeft = new Posn(-1, 0);
+    Posn goRight = new Posn(1, 0);
+    Posn goDown = new Posn(0, -1);
+    Posn goUp = new Posn(0, 1);
+
+    ArrayList<Posn> fourWaysToGo = new ArrayList<Posn>(Arrays.asList(goLeft, goRight,
+        goDown, goUp));
+
+    // get all of the directions, and add them to the row to get the piece in that direction
+    for (int ind = 0; ind < fourWaysToGo.size(); ind++) {
+      Posn p = fourWaysToGo.get(ind);
+      int xPlace = gP.col + p.x;
+      int yPlace = gP.row + p.y;
+
+      // two arrays of ints that have numbers mapping corresponding to fourWaysToGo array for
+      // the isDirectionFromNumMapping method
+      ArrayList<Integer> mappings1 = new ArrayList<>(Arrays.asList(2, 3, 0, 1));
+      ArrayList<Integer> mappings2 = new ArrayList<>(Arrays.asList(3, 2, 1, 0));
+
+      // if conditions where the gamePiece isn't in the accumulated already seen list yet, add it
+      if (this.checkWithinBoundaries(xPlace, yPlace)
+          && gP.getConnectorFromNumMapping(mappings1.get(ind))
+          && this.getCorrespondingPiece(xPlace,
+              yPlace).getConnectorFromNumMapping(mappings2.get(ind))
+          && !accumulated.contains(this.getCorrespondingPiece(xPlace, yPlace))) {
+        connections.add(this.getCorrespondingPiece(xPlace, yPlace));
+      }
+    }
+    // output the array list of gamePieces of all connected pieces
+    return connections;
+  }
+
+  // gets the diameter of the board based on the depth of the graph, and based on
+  // bfs getting the furthest piece, and sets the radius to the diameter
+  public void setRadiusToGraphDiameter() {
+    GamePiece furthestPiece = this.bfsGettingFurthest(this.getCorrespondingPiece(0, 0));
+    // get depth between that furthest piece and bfsGettingFurthest performed
+    // on that furthest found piece
+    int diameter = this.bfsCountsDepth(furthestPiece,
+        this.bfsGettingFurthest(furthestPiece), new ArrayList<GamePiece>());
+    // set the radius to the desired diameter measurement
+    this.radius = (diameter / 2) + 1;
+  }
+
+  // does a breadth-first search that returns a count of the depth / steps between the
+  // first and second given gamePieces, using an accumulated list of visited gamePiece
+  int bfsCountsDepth(GamePiece first, GamePiece furthest, ArrayList<GamePiece> acc) {
+    GamePiece furthestSoFar = first;
+    // get an array of all gamePiece connected
+    ArrayList<GamePiece> connections = this.connectedGamePieces(furthestSoFar, acc);
+    acc.add(furthestSoFar);
+
+    // case where start and end entered are the same gamePiece - zero steps in search
+    if (first.sameGamePiece(furthest)) {
+      //      System.out.print("A");
+      return 0;
+    }
+    // if there are no connections or neighbors, return minimum value (smallest comparable int)
+    if (connections.size() == 0) {
+      return Integer.MIN_VALUE;
+    }
+
+    // an array of depths where a maximum depth will be determined from
+    ArrayList<Integer> allDepthCounts = new ArrayList<Integer>();
+    // every piece connected
+    for (int i = 0; i < connections.size(); i++) {
+      GamePiece piece = connections.get(i);
+      // would return one if there is only one connection
+      if (piece.sameGamePiece(furthest)) {
+        return 1;
+      }
+
+      // else, recursively calls the depth first search on the pieces in the connections
+      allDepthCounts.add(1 + bfsCountsDepth(piece, furthest, acc));
+    }
+
+    // get the maximum depth in the list of counts of depths
+    int maxSoFar = allDepthCounts.get(0);
+    for (int i = 1; i < allDepthCounts.size(); i++) {
+      maxSoFar = Math.max(maxSoFar, allDepthCounts.get(i));
+    }
+
+    return maxSoFar;
+  }
+
+
+  // does a breadth-first search that returns the furthest gamePiece from the given gamePiece
+  GamePiece bfsGettingFurthest(GamePiece first) {
+    ArrayQueueUtils<GamePiece> queue = new ArrayQueueUtils<>(new ArrayList<>(
+        Arrays.asList(first)));
+
+    ArrayList<GamePiece> acc = new ArrayList<GamePiece>();
+
+    GamePiece furthestSoFar = first;
+
+    while (queue.size() > 0) {
+      furthestSoFar = queue.removeFromFront();
+      acc.add(furthestSoFar);
+      queue.addAll(this.connectedGamePieces(furthestSoFar, acc));
+
+    }
+
+    return furthestSoFar;
+
+
+  }
+
+  // returns an arrayList of edges with all of the possible edges in the game board added to it
+  public ArrayList<Edge> constructEdgeList() {
+
+    ArrayList<Edge> edges = new ArrayList<Edge>();
+
+    Random r = new Random();
+
+    for (int i = 0; i < width; i++) {
+      for (int j = 0; j < height; j++) {
+
+        // if within boundaries of game to add edges left to right
+        if (i < width - 1) {
+          edges.add(new Edge(this.getCorrespondingPiece(i, j),
+              this.getCorrespondingPiece(i + 1, j), r.nextInt(20)));
+        } 
+        // if within boundaries of game to add edges top to bottom
+        if (j < height - 1) {
+          edges.add(new Edge(this.getCorrespondingPiece(i, j),
+              this.getCorrespondingPiece(i, j + 1), r.nextInt(20)));
+        }
+      }
+    }
+    // finally, return the accumulated list of edges to work with
+    return edges;
+  }
+
+  // creates the minimum spanning tree required for the lightEmAll game utilizing the
+  // given list of edges to work with which has been sorted utilizing heap sort
+  public void minimumSpanningTree(ArrayList<Edge> edges) {
+
+    HashMap<GamePiece, GamePiece> rep = new HashMap<GamePiece, GamePiece>();
+
+    ArrayList<Edge> edgeListFinal = new ArrayList<Edge>();
+
+    Deque<Edge> result = new Deque<Edge>();
+
+    // for each edge from the given edge list, add it to the back of the workList
+    for (int i = 0; i < edges.size(); i++) {
+      result.addAtTail(edges.get(i));
+    }
+
+    // put every node in this game's node list in the HashMap, and set its representative to itself
+    for (int i = 0; i < this.nodes.size(); i++) {
+      rep.put(this.nodes.get(i), nodes.get(i));
+    }
+
+    // condition that workList of edges isn't complete yet - becomes complete when the final 
+    // edge list for the MST has one less element than the size of elements in the list of nodes
+    while (result.size() > 0 && edgeListFinal.size() < this.nodes.size() - 1) {
+
+      // place value edge
+      Edge headEdge = result.removeFromHead();
+
+      if (getRepresentative(rep, headEdge.fromNode) != getRepresentative(rep, headEdge.toNode)) {
+
+        // condition to add the edge place value to the final edge list for the mst,
+        // and change the representatives hashMap in order to keep going with the edge list
+        edgeListFinal.add(headEdge);
+        this.putRepresentatives(rep, this.getRepresentative(rep, headEdge.fromNode),
+            this.getRepresentative(rep, headEdge.toNode), 0);
+      }
+    }
+    this.mst = edgeListFinal;
+  }
+
+  // takes the given representative hash map of game pieces, and takes the two given game
+  // pieces, and puts both the game pieces into the representatives map
+  void putRepresentatives(HashMap<GamePiece, GamePiece> representatives,
+      GamePiece piece1, GamePiece piece2, int indx) {
+
+    representatives.put(representatives.get(piece1), representatives.get(piece2));
+  }
+
+  // returns the given game Piece when it is found in the given hash map of representatives
+  GamePiece getRepresentative(HashMap<GamePiece, GamePiece> representatives, GamePiece piece) {
+
+    //checks if they are the same two gamepieces
+    if (piece.sameGamePiece(representatives.get(piece))) {
+      return piece;
+    }
+    // otherwise, recursively call this method on the hashMap of gamePieces and piece
+
+    return this.getRepresentative(representatives, representatives.get(piece));
+  }
+
+  // performs a heap sort using the given array list of edges, and the given int
+  // that represents the size of the list of edges
+  public void heapSort(ArrayList<Edge> listEdge) {
+
+    int sizeEdges = listEdge.size();
+    // staring from half of the size of list of edges, decrements
+    for (int i = (sizeEdges / 2) - 1; i >= 0; i--) {
+      this.heapSortHelp(i, listEdge, sizeEdges);
+      //      System.out.print("a");
+    }
+    // takes into factor swap method for edges and heap sort help when edges swap
+    for (int j = sizeEdges - 1; j >= 0; j--) {
+      this.swapEdges(listEdge, 0, j);
+      this.heapSortHelp(0, listEdge, j);
+    }
+  }
+
+  // properly sets index, third number given, and sets the heap properties for heap sort
+  // based on the index and the given values for the edge work list
+  void heapSortHelp(int heapIndex, ArrayList<Edge> edgeWorkList, int sizeEdges) {
+    int count = 0;
+    // index, and location indexes to recurse heap on
+    int index = heapIndex;
+    int halve1 = 2 * heapIndex + 1;
+    int halve2 = 2 * heapIndex + 2;
+
+    // condition to set index to index at two times the heap index plus one
+    if (halve1 < sizeEdges && edgeWorkList.get(halve1).weight > edgeWorkList.get(index).weight) {
+      index = halve1;
+      count++;
+    }
+    // condition to set index to index at two times the heap index plus two
+    if (halve2 < sizeEdges && edgeWorkList.get(halve2).weight > edgeWorkList.get(index).weight) {
+      index = halve2;
+      count++;
+    }
+    // condition to recurse on the heapsort help where the heapIndex does not equal the desired
+    if (heapIndex != index) {
+      this.swapEdges(edgeWorkList, heapIndex, index);
+      this.heapSortHelp(index, edgeWorkList, sizeEdges);
+      count++;
+    }
+    //    
+    //    if (heapIndex > 2) {
+    //       this.swapEdges(edgeWorkList, heapIndex, index);
+    //    }
+
+    //    System.out.print(count);
+  }
+
+  // check if this two by two board is shaped like a U in some way
+  // NOTE: used only for testing Kruskal methods - not used in constructing of the game
+  boolean isShapedLikeU() {
+    return // regular U
+        (this.board.get(0).get(0).bottom && this.board.get(0).get(1).top
+            && this.board.get(0).get(1).right && this.board.get(1).get(0).bottom
+            && this.board.get(1).get(1).top && this.board.get(1).get(1).left)
+        // right-facing U
+        || (this.board.get(0).get(0).bottom && this.board.get(0).get(0).right
+            && this.board.get(0).get(1).top && this.board.get(0).get(1).right
+            && this.board.get(1).get(1).left && this.board.get(1).get(0).left)
+        // left-facing U
+        || (this.board.get(0).get(0).right && this.board.get(0).get(1).right
+            && this.board.get(1).get(1).top && this.board.get(1).get(1).left
+            && this.board.get(1).get(0).bottom && this.board.get(1).get(0).left)
+        // upside-down U
+        || (this.board.get(0).get(0).bottom && this.board.get(0).get(0).right
+            && this.board.get(1).get(0).left && this.board.get(1).get(0).bottom
+            && this.board.get(1).get(1).top && this.board.get(0).get(1).top);
+  }
+
+
+  // outputs true if conditions are met where all of the gamePieces
+  // have been connected to the powerSource, and thus the game has been won
+  public boolean checkWin() {
+    int count = 0;
+    int totalWires = this.height * this.width;
+    for (int i = 0; i < this.width; i++) {
+      for (int j = 0; j < this.height; j++) {
+        if (this.getCorrespondingPiece(i, j).isLit || this.getCorrespondingPiece(i, j).isSemiLit
+            || this.getCorrespondingPiece(i, j).barelyLit) {
+          count++;
+        }
+      }
+    }
+    return count == totalWires;
+  }
+
+  // outputs the final worldScene for when the lightEmAll game has been won
+  public WorldScene gameWin() {
+    int xPlacement = LightEmAll.GAME_HEIGHT / this.width;
+    int yPlacement = LightEmAll.GAME_WIDTH / this.height;
+
+    WorldScene scene = this.getEmptyScene();
+
+    scene.placeImageXY(
+        new RectangleImage(LightEmAll.GAME_WIDTH, LightEmAll.GAME_HEIGHT,
+            OutlineMode.SOLID, Color.DARK_GRAY),
+        LightEmAll.GAME_WIDTH / 2, LightEmAll.GAME_HEIGHT / 2);
+
+    scene = this.drawAllGrids(xPlacement, yPlacement, scene);
+
+    scene.placeImageXY(new TextImage("YOU WIN! " + " Number of Clicks Taken:" + this.mouseClick
+        + " Time taken: " + this.counter + " seconds", Color.GREEN), 
+        LightEmAll.GAME_WIDTH / 2, LightEmAll.GAME_HEIGHT / 2);
+
+    return scene;
+  }
+
+  // outputs an ending to the world based if the game has been won or not
+  public WorldEnd worldEnds() {
+    if (this.checkWin()) {
+      return new WorldEnd(true, this.gameWin());
+    }
+
+    else {
+      return new WorldEnd(false, this.makeScene());
+    }
+  }
+
+}
+
+// represents a Queue with an array of elements
+class ArrayQueueUtils<T> {
+  ArrayList<T> array;
+
+  // constructor for an Array Queue
+  ArrayQueueUtils(ArrayList<T> array) {
+    this.array = array;
+  }
+
+  // adds an item to the back of this Queue
+  void addAtBack(T element) {
+    this.array.add(element);
+  }
+
+  // adds all of the given elements as an array to the back of this Array Queue
+  void addAll(ArrayList<T> array) {
+    for (T t : array) {
+      this.addAtBack(t);
+    }
+  }
+
+  // returns the size of the Array Queue
+  int size() {
+    return this.array.size();
+  }
+
+  // returns and removes an element from the front of this ArrayQueue
+  T removeFromFront() {
+    if (this.size() > 0) {
+      return this.array.remove(0);
+    }
+    else {
+
+      return null;
+    }
+  }
+
+}
+
+// to represent an abstraction for a node
+abstract class ANode<T>  {
+  ANode<T> next; // the next node in the node
+  ANode<T> prev; // the previous node in the node
+
+  // ANode empty constructor
+  ANode() {
+
+  }
+
+  // ANode constructor with next and previous nodes
+  ANode(ANode<T> next, ANode<T> prev) {
+    this.next = next;
+    this.prev = prev;
+  }
+
+  // returns a count of the non-empty nodes in the given node
+  abstract int count();
+
+  // adds the data as a new node in between the two given node(s) and/or sentinel(s)
+  abstract void addAtHelper(T t, ANode<T> first, ANode<T> second);
+
+  // removes the desired data from the front or back node in this node or sentinel
+  abstract T removeFromHelper();
+
+  // returns the first node that the given predicate returns true for
+  abstract ANode<T> findNode(IPred<T> pred);
+
+}
+
+// represents a sentinel node
+class Sentinel<T> extends ANode<T> {
+
+  // standard sentinel constructor
+  Sentinel(ANode<T> next, ANode<T> prev) {
+    super(next, prev);
+  }
+
+  // empty sentinel constructor where sentinel refers to itself
+  Sentinel() {
+    this.next = this;
+    this.prev = this;
+  }
+
+  // returns count at this point in the node for a sentinel (0)
+  public int count() {
+    return 0;
+  }
+
+  // returns a count of the nodes in the given sentinel node
+  int sizeHelper() { 
+    return this.next.count();
+
+  }
+
+  // creates a new node with the data, and adds at the front and the tail of this sentinel
+  void addAtHelper(T t, ANode<T> first, ANode<T> second) {
+    Node<T> addedNode = new Node<T>(t);
+    addedNode.next = this;
+    addedNode.prev = this;
+    this.next = addedNode;
+    this.prev = addedNode;    
+  }
+
+  // throws an exception, as there is no data in the front of the sentinel node
+  T removeFromHelper() {
+    throw new RuntimeException("Deque is empty");
+  }
+
+  // returns the sentinel node if the predicate did not return true for any node
+  // or if this sentinel is empty
+  ANode<T> findNode(IPred<T> pred) {
+    return this;
+  }
+
+}
+
+//represents a node with data and a next and previous nodes 
+class Node<T> extends ANode<T> {
+  T data; // the data in the node
+
+  // constructor with just data that sets the previous and next nodes to null
+  Node(T data) {
+    this.data = data;
+    this.next = null;
+    this.prev = null;
+  }
+
+  // convenience constructor with data, and a next and previous node
+  Node(T data, ANode<T> first, ANode<T> second) {
+    super(first, second);
+    if (first == null || second == null) { 
+      throw new IllegalArgumentException("next and/or prev is null");
+    }
+
+    this.data = data;
+    second.next = this;
+    first.prev = this;
+  }
+
+  // returns the count of nodes in the given node, increments one with a non-empty node
+  public int count() {
+    return 1 + this.next.count();
+  }
+
+
+  // creates a new node with the given data and adds it in between the two given nodes
+  // with proper re-ordering
+  void addAtHelper(T t, ANode<T> first, ANode<T> second) {
+    Node<T> addedNode = new Node<T>(t);
+    addedNode.next = second;
+    addedNode.prev = first;
+    first.next = addedNode;
+    second.prev = addedNode;
+
+  }
+
+  // returns the data as this is the non-empty node at the front of the sentinel
+  T removeFromHelper() {
+    this.prev.next = this.next;
+    this.next.prev = this.prev;
+    return this.data;
+  }
+
+  // moves through the given node and returns the first node which the predicate returns true for
+  ANode<T> findNode(IPred<T> pred) {
+    if (pred.apply(this.data)) {
+      return this;
+    }
+    return this.next.findNode(pred);
+  }
+
+
+}
+
+//represents a deque
+class Deque<T> {
+  Sentinel<T> header; // represents the header sentinel node of the deque
+
+  // represents an empty constructor that sets the value of the deque to a new sentinel node
+  Deque() {
+    this.header = new Sentinel<T>();
+  }
+
+  // represents a standard constructor for a deque
+  Deque(Sentinel<T> header) {
+    this.header = header;
+  }
+
+  // returns the amount of nodes in the sentinel node of the deque
+  int size() {
+    return this.header.sizeHelper();
+  }
+
+  // adds a new node with the given data to the front of the deque
+  void addAtHead(T t) { 
+    this.header.next.addAtHelper(t, this.header, this.header.next);
+  }
+
+  // adds a new node with the given data to the back of the deque
+  void addAtTail(T t) {
+    this.header.prev.addAtHelper(t, this.header.prev, this.header);
+  }
+
+  // removes the data from the front of the deque
+  T removeFromHead() {
+    return this.header.next.removeFromHelper();
+  }
+
+  // removes the data from the back of the deque
+  T removeFromTail() {
+    return this.header.prev.removeFromHelper();
+  }
+
+  // returns the first node for which the given predicate returns true for, or returns
+  // the sentinel if the predicate never returns true for the nodes
+  ANode<T> find(IPred<T> pred) {
+    return this.header.next.findNode(pred);
+  }
+
+  // re-orders the given deque so that the given node is removed from the deque
+  void removeNode(ANode<T> target) {
+    target.next.prev = target.prev;
+    target.prev.next = target.next;
+  }
+}
+
+//represents a predicate, which returns a boolean when applied on an argument
+interface IPred<T> {
+  boolean apply(T t);
+}
+
+//represents a predicate that returns true if the first letter of the string is "d"
+class IsFirstLetterD implements IPred<String> {
+
+  // determines if the argument's first character is "d"
+  public boolean apply(String str) {
+    return str.charAt(0) == 'd';
+  }
+
+}
+
+//represents a predicate that returns true if the string is "bcd"
+class IsStringBCD implements IPred<String> {
+
+  // determines if the argument is "bcd"
+  public boolean apply(String str) {
+    return str.equals("bcd");
+  }
+
+}
+
+//represents a predicate that returns true if the string is "monkey"
+class IsStringMonkey implements IPred<String> {
+
+  // determines if the argument is "monkey"
+  public boolean apply(String str) {
+    return str.equals("monkey");
+  }
+
+}
+
+
+// represents an edge in the graph of the lightEmAll game
+class Edge {
+  GamePiece fromNode; // the gamePiece this edge starts from
+  GamePiece toNode; // the gamePiece this edge goes to
+  int weight; // the weight of this edge
+
+  // constructor for an edge
+  Edge(GamePiece fromNode, GamePiece toNode, int weight) {
+    this.fromNode = fromNode;
+    this.toNode = toNode;
+    this.weight = weight;
+  }
+}
+
+
+// EXAMPLE CLASS TO RUN THE GAME
+class ExampleLightEmAll {
+
+  // input values are the dimensions of the game
+  // big bang inputs need to be kept in order to maintain counters for Extra Credit
+  // to display counters for clicks and time taken, and to properly count the time taken
+  void testBigBang(Tester t) {
+    LightEmAll game = new LightEmAll(5, 5);
+    game.bigBang(600, 700, 1);
+  }
+}
+
+// Examples to test our deque methods
+class ExamplesDeque {
+
+  Sentinel<String> sen0;
+  Deque<String> deque1;
+
+  Deque<String> deque2;
+  Sentinel<String> sen1;
+  Node<String> node1;
+  Node<String> node2;
+  Node<String> node3;
+  Node<String> node4;
+
+  Deque<String> deque3;
+  Sentinel<String> sen2;
+  Node<String> node5;
+  Node<String> node6;
+  Node<String> node7;
+  Node<String> node8;
+
+  Node<String> node9;
+
+  IsFirstLetterD isFirstD;
+
+  IsStringBCD isBCD;
+
+  IsStringMonkey isMonkey;
+
+  // The initialization of the data
+  void initData() {
+
+    this.sen0 = new Sentinel<String>();
+    this.deque1 = new Deque<String>(this.sen0);
+
+    this.sen1 = new Sentinel<String>();
+    this.deque2 = new Deque<String>(this.sen1);
+    this.node1 = new Node<String>("abc", this.sen1, this.sen1);
+    this.node2 = new Node<String>("bcd", this.sen1, this.node1);
+    this.node3 = new Node<String>("cde", this.sen1, this.node2);
+    this.node4 = new Node<String>("def", this.sen1, this.node3);
+
+    this.sen2 = new Sentinel<String>();
+    this.deque3 = new Deque<String>(this.sen2);
+    this.node5 = new Node<String>("dog", this.sen2, this.sen2);
+    this.node6 = new Node<String>("cat", this.sen2, this.node5);
+    this.node7 = new Node<String>("horse", this.sen2, this.node6);
+    this.node8 = new Node<String>("dolphin", this.sen2, this.node7);
+
+    this.isFirstD = new IsFirstLetterD();
+
+    this.isBCD = new IsStringBCD();
+
+    this.isMonkey = new IsStringMonkey();
+
+  }
+
+  // Tests:
+
+
+  void testNodeConstructor(Tester t) {
+    this.initData();
+    t.checkConstructorException(new IllegalArgumentException("next and/or prev is null"),
+        "Node", "hi", null, null);
+    t.checkConstructorException(new IllegalArgumentException("next and/or prev is null"),
+        "Node", "abcdefg", null, this.sen0);
+
+  }
+
+  void testSize(Tester t) {
+    this.initData();
+    t.checkExpect(this.deque1.size(), 0);
+    t.checkExpect(this.deque2.size(), 4);
+    t.checkExpect(this.deque3.size(), 4);
+
+  }
+
+  void testAddAtHead(Tester t) {
+    this.initData();
+    this.deque1.addAtHead("hi");
+    t.checkExpect(this.sen0.next, new Node<String>("hi",
+        this.sen0, this.sen0));
+    t.checkExpect(this.sen0.prev, new Node<String>("hi",
+        this.sen0, this.sen0));
+    this.deque2.addAtHead("hello");
+    t.checkExpect(this.sen1.next, new Node<String>("hello", this.node1, this.sen1));
+    t.checkExpect(this.node1.prev, new Node<String>("hello", this.node1, this.sen1));
+    this.deque3.addAtHead("howdy");
+    t.checkExpect(this.sen2.next, new Node<String>("howdy", this.node5, this.sen2));
+    t.checkExpect(this.node5.prev, new Node<String>("howdy", this.node5, this.sen2));
+
+  }
+
+  void testAddAtTail(Tester t) {
+    this.initData();
+    this.deque1.addAtTail("hi");
+    t.checkExpect(this.sen0.prev, new Node<String>("hi", this.sen0, this.sen0));
+    t.checkExpect(this.sen0.next, new Node<String>("hi", this.sen0, this.sen0));
+    this.deque2.addAtTail("hello");
+    t.checkExpect(this.sen1.prev, new Node<String>("hello", this.sen1, this.node4));
+    t.checkExpect(this.node4.next, new Node<String>("hello", this.sen1, this.node4));
+    this.deque3.addAtTail("howdy");
+    t.checkExpect(this.sen2.prev, new Node<String>("howdy", this.sen2, this.node8));
+    t.checkExpect(this.node8.next, new Node<String>("howdy", this.sen2, this.node8));
+
+  }
+
+  void testRemoveFromHead(Tester t) {
+    this.initData();
+    t.checkExpect(this.deque3.removeFromHead(), "dog");
+    t.checkExpect(this.deque2.removeFromHead(), "abc");
+    t.checkException(new RuntimeException("Deque is empty"), this.deque1, "removeFromHead");
+
+  }
+
+  void testRemoveFromTail(Tester t) {
+    this.initData();
+    t.checkExpect(this.deque3.removeFromTail(), "dolphin");
+    t.checkExpect(this.deque2.removeFromTail(), "def");
+    t.checkException(new RuntimeException("Deque is empty"), this.deque1, "removeFromTail");
+
+  }
+
+  void testFind(Tester t) {
+    this.initData();
+    t.checkExpect(this.deque3.find(this.isFirstD), this.node5);
+    t.checkExpect(this.deque2.find(this.isFirstD), this.node4);
+    t.checkExpect(this.deque2.find(this.isBCD), this.node2);
+    t.checkExpect(this.deque3.find(this.isBCD), this.sen2);
+    t.checkExpect(this.deque2.find(this.isMonkey), this.sen1);
+    t.checkExpect(this.deque3.find(this.isMonkey), this.sen2);
+
+  }
+
+  void testRemoveNode(Tester t) {
+    this.initData();
+    this.deque2.removeNode(this.node1);
+    t.checkExpect(this.sen1.next, this.node2);
+    t.checkExpect(this.node2.prev, this.sen1);
+    this.deque3.removeNode(this.node6);
+    t.checkExpect(this.node5.next, this.node7);
+    t.checkExpect(this.node7.prev, this.node5);
+    this.deque1.removeNode(this.sen0);
+    t.checkExpect(this.sen0.next, this.sen0);
+    t.checkExpect(this.sen0.prev, this.sen0);
+
+  }
+
+  void testSizeHelper(Tester t) {
+    this.initData();
+    t.checkExpect(this.sen0.sizeHelper(), 0);
+    t.checkExpect(this.sen1.sizeHelper(), 4);
+    t.checkExpect(this.sen2.sizeHelper(), 4);
+
+  }
+
+  void testCount(Tester t) {
+    this.initData();
+    t.checkExpect(this.sen0.count(), 0);
+    t.checkExpect(this.sen1.count(), 0);
+    t.checkExpect(this.sen2.count(), 0);
+    t.checkExpect(this.node4.count(), 1);
+    t.checkExpect(this.node7.count(), 2);
+
+  }
+
+  void testAddAtHelper(Tester t) {
+    this.initData();
+    this.sen0.addAtHelper("hi", this.node1, this.sen0);
+    t.checkExpect(this.sen0.next, new Node<String>("hi", this.sen0, this.sen0));
+    t.checkExpect(this.sen0.prev, new Node<String>("hi", this.sen0, this.sen0));
+    this.sen2.addAtHelper("hello", this.node1, this.node3);
+    t.checkExpect(this.sen2.next, new Node<String>("hello", this.sen2, this.sen2));
+    t.checkExpect(this.sen2.prev, new Node<String>("hello", this.sen2, this.sen2));
+    this.node1.addAtHelper("howdy", this.sen1, this.node1);
+    t.checkExpect(this.sen1.next, new Node<String>("howdy", this.node1, this.sen1));
+    t.checkExpect(this.node1.prev, new Node<String>("howdy", this.node1, this.sen1));
+    this.node6.addAtHelper(":)", this.node5, this.node6);
+    t.checkExpect(this.node5.next, new Node<String>(":)", this.node6, this.node5));
+    t.checkExpect(this.node6.prev, new Node<String>(":)", this.node6, this.node5));
+
+  }
+
+  void testRemoveFromHelper(Tester t) {
+    this.initData();
+    t.checkException(new RuntimeException("Deque is empty"), this.sen0, "removeFromHelper");
+    t.checkException(new RuntimeException("Deque is empty"), this.sen1, "removeFromHelper");
+    t.checkException(new RuntimeException("Deque is empty"), this.sen2, "removeFromHelper");
+    t.checkExpect(this.node1.removeFromHelper(), "abc");
+    t.checkExpect(this.node2.removeFromHelper(), "bcd");
+    t.checkExpect(this.node7.removeFromHelper(), "horse");
+    this.node1.removeFromHelper();
+    t.checkExpect(this.sen1.next, this.node2);
+    t.checkExpect(this.node2.prev, this.sen1);
+    this.node6.removeFromHelper();
+    t.checkExpect(this.node5.next, this.node8);
+    t.checkExpect(this.node8.prev, this.node5);
+
+  }
+
+  void testFindNode(Tester t) {
+    this.initData();
+    t.checkExpect(this.sen0.findNode(this.isFirstD), this.sen0);
+    t.checkExpect(this.sen1.findNode(this.isFirstD), this.sen1);
+    t.checkExpect(this.sen2.findNode(this.isBCD), this.sen2);
+    t.checkExpect(this.node1.findNode(this.isFirstD), this.node4);
+    t.checkExpect(this.node4.findNode(this.isFirstD), this.node4);
+    t.checkExpect(this.node5.findNode(this.isFirstD), this.node5);
+    t.checkExpect(this.node7.findNode(this.isFirstD), this.node8);
+    t.checkExpect(this.node8.findNode(this.isFirstD), this.node8);
+    t.checkExpect(this.node1.findNode(this.isBCD), this.node2);
+    t.checkExpect(this.node2.findNode(this.isBCD), this.node2);
+    t.checkExpect(this.node3.findNode(this.isBCD), this.sen1);
+    t.checkExpect(this.node5.findNode(this.isMonkey), this.sen2);
+    t.checkExpect(this.node7.findNode(this.isMonkey), this.sen2);
+    t.checkExpect(this.node8.findNode(this.isMonkey), this.sen2);
+
+  }
+
+  void testApply(Tester t) {
+    this.initData();
+    t.checkExpect(this.isFirstD.apply("hello"), false);
+    t.checkExpect(this.isFirstD.apply("dog"), true);
+    t.checkExpect(this.isFirstD.apply("dolphin"), true);
+    t.checkExpect(this.isBCD.apply("abc"), false);
+    t.checkExpect(this.isBCD.apply("bcd"), true);
+    t.checkExpect(this.isBCD.apply("dog"), false);
+    t.checkExpect(this.isMonkey.apply("monkey"), true);
+    t.checkExpect(this.isMonkey.apply("hello"), false);
+    t.checkExpect(this.isMonkey.apply("cat"), false);
+    t.checkExpect(this.isMonkey.apply("abc"), false);
+
+  }
+
+}
+
+// Examples to test methods that were created for the game
+class ExamplesGameMethods {
+
+  Random rand;
+
+  GamePiece gp1;
+  GamePiece gp2;
+  GamePiece gp3;
+  GamePiece gp4;
+  GamePiece gp5;
+  GamePiece gp6;
+
+  Edge e1;
+  Edge e2;
+  Edge e3;
+  Edge e4;
+
+  ArrayList<GamePiece> alGP1;
+  ArrayList<GamePiece> alGP2;
+
+  ArrayQueueUtils<Integer> arrayQueue;
+  ArrayList<Integer> array;
+
+
+  ArrayList<ArrayList<GamePiece>> board;
+
+  LightEmAll lightEmAllEx;
+
+  Posn p1 = new Posn(0, 0);
+  Posn p2 = new Posn(300, 300);
+
+  WorldImage wireBot = new LineImage(new Posn(0, 50), Color.GRAY).movePinhole(0, -25);
+  WorldImage wireBot2 = new LineImage(new Posn(0, 50), Color.YELLOW).movePinhole(0, -25);
+  WorldImage wireBot3 = new LineImage(new Posn(0, 50), Color.CYAN).movePinhole(0, -25);
+  WorldImage wireBot4 = new LineImage(new Posn(0, 50), Color.BLUE).movePinhole(0, -25);
+  WorldImage tile = new RectangleImage(100, 100, OutlineMode.OUTLINE, Color.black);
+
+
+  // initialization of the data
+  void initData() {
+    this.rand = new Random(5);
+    this.gp1 = new GamePiece();
+    this.gp2 = new GamePiece();
+    this.gp3 = new GamePiece();
+    this.gp4 = new GamePiece();
+    this.gp5 = new GamePiece();
+    this.gp6 = new GamePiece();
+
+    this.alGP1 = new ArrayList<GamePiece>(Arrays.asList(this.gp1, this.gp2, this.gp3));
+    this.alGP2 = new ArrayList<GamePiece>(Arrays.asList(this.gp4, this.gp5, this.gp6));
+
+    this.board = new ArrayList<ArrayList<GamePiece>>();
+
+    this.lightEmAllEx = new LightEmAll(2, 2, 0, 0, 0);
+
+    this.array = new ArrayList<Integer>(Arrays.asList(1));
+
+    this.arrayQueue = new ArrayQueueUtils<Integer>(this.array);
+
+    this.e1 = new Edge(this.gp1, this.gp1, 1);
+    this.e2 = new Edge(this.gp1, this.gp2, 1); 
+
+  }
+
+  // Tests:
+
+  void testPlaceAt(Tester t) {
+    this.initData();
+    this.gp1.bottom = true;
+    this.gp2.right = true;
+    this.gp3.top = true;
+    this.gp4.left = true;
+    this.gp5.powerStation = true;
+
+    t.checkExpect(this.gp1.placeAt(100, 100), new OverlayImage(this.wireBot, this.tile));
+    t.checkExpect(this.gp2.placeAt(100, 100), new OverlayImage(new RotateImage(this.wireBot, 270),
+        this.tile));
+    t.checkExpect(this.gp3.placeAt(100, 100), new OverlayImage(new RotateImage(this.wireBot, 180),
+        this.tile));
+    t.checkExpect(this.gp4.placeAt(100, 100), new OverlayImage(new RotateImage(this.wireBot, 90),
+        this.tile));
+    t.checkExpect(this.gp5.placeAt(100, 100), new OverlayImage(new StarImage(
+        50, OutlineMode.SOLID, Color.BLUE), this.tile));
+
+    this.gp1.right = true;
+
+    t.checkExpect(this.gp1.placeAt(100, 100), new OverlayImage(this.wireBot,
+        new OverlayImage(new RotateImage(this.wireBot, 270), this.tile)));
+
+    this.gp1.top = true;
+
+    t.checkExpect(this.gp1.placeAt(100, 100), new OverlayImage(this.wireBot,
+        new OverlayImage(new RotateImage(this.wireBot, 180),
+            new OverlayImage(new RotateImage(this.wireBot, 270), this.tile))));
+
+    this.gp1.left = true;
+
+    t.checkExpect(this.gp1.placeAt(100, 100), new OverlayImage(this.wireBot,
+        new OverlayImage(new RotateImage(this.wireBot, 180),
+            new OverlayImage(new RotateImage(this.wireBot, 270),
+                new OverlayImage(new RotateImage(this.wireBot, 90), this.tile)))));
+
+    this.initData();
+    this.gp1.bottom = true;
+    this.gp1.isLit = true;
+
+    t.checkExpect(this.gp1.placeAt(100, 100), new OverlayImage(this.wireBot2, this.tile));
+
+    this.initData();
+    this.gp1.bottom = true;
+    this.gp1.isSemiLit = true;
+
+    t.checkExpect(this.gp1.placeAt(100, 100), new OverlayImage(this.wireBot3, this.tile));
+
+    this.initData();
+    this.gp1.bottom = true;
+    this.gp1.barelyLit = true;
+
+    t.checkExpect(this.gp1.placeAt(100, 100), new OverlayImage(this.wireBot4, this.tile));  
+
+
+  }
+
+  void testClearAll(Tester t) {
+    this.initData();
+    this.gp1 = new GamePiece(0, 0, true, true, true, true, true, true);
+
+    this.gp1.clearAll();
+    t.checkExpect(this.gp1.left, false);
+    t.checkExpect(this.gp1.bottom, false);
+    t.checkExpect(this.gp1.right, false);
+    t.checkExpect(this.gp1.top, false);
+    t.checkExpect(this.gp1.powerStation, false);
+    t.checkExpect(this.gp1.isLit, false);
+    t.checkExpect(this.gp1.isSemiLit, false);
+    t.checkExpect(this.gp1.barelyLit, false);
+
+  }
+
+  void testGetConnectorFromNumMapping(Tester t) {
+    this.initData();
+    this.gp1.left = true;
+    this.gp1.right = false;
+    this.gp1.bottom = true;
+    this.gp1.top = false;
+
+    t.checkExpect(this.gp1.getConnectorFromNumMapping(0), false);
+    t.checkExpect(this.gp1.getConnectorFromNumMapping(1), true);
+    t.checkExpect(this.gp1.getConnectorFromNumMapping(2), true);
+    t.checkExpect(this.gp1.getConnectorFromNumMapping(3), false);
+    t.checkExpect(this.gp1.getConnectorFromNumMapping(4), false);
+    t.checkExpect(this.gp1.getConnectorFromNumMapping(167), false);
+
+
+  }
+
+  void testMakeNewPowerStation(Tester t) {
+    this.initData();
+    t.checkExpect(this.gp1.powerStation, false);
+    this.gp1.makeNewPowerStation(this.gp2);
+    t.checkExpect(this.gp1.powerStation, false);
+    t.checkExpect(this.gp2.powerStation, true);
+    this.gp2.makeNewPowerStation(this.gp1);
+    t.checkExpect(this.gp1.powerStation, true);
+    t.checkExpect(this.gp2.powerStation, false);
+
+
+  }
+
+  void testHasLeftNow(Tester t) {
+    this.initData();
+
+    t.checkExpect(this.gp1.left, false);
+
+    this.gp1.hasLeftNow();
+
+    t.checkExpect(this.gp1.left, true);
+  }
+
+  void testHasRightNow(Tester t) {
+    this.initData();
+
+    t.checkExpect(this.gp1.right, false);
+
+    this.gp1.hasRightNow();
+
+    t.checkExpect(this.gp1.right, true);
+  }
+
+  void testHasTopNow(Tester t) {
+    this.initData();
+
+    t.checkExpect(this.gp1.top, false);
+
+    this.gp1.hasTopNow();
+
+    t.checkExpect(this.gp1.top, true);
+  }
+
+  void testHasBottomNow(Tester t) {
+    this.initData();
+
+    t.checkExpect(this.gp1.bottom, false);
+
+    this.gp1.hasBottomNow();
+
+    t.checkExpect(this.gp1.bottom, true);
+  }
+
+  void testHasPowerStation(Tester t) {
+    this.initData();
+
+    t.checkExpect(this.gp1.powerStation, false);
+
+    this.gp1.hasPowerStation();
+
+    t.checkExpect(this.gp1.powerStation, true);
+  }
+
+  void testMakePowered(Tester t) {
+    this.initData();
+
+    t.checkExpect(this.gp1.isLit, false);
+
+    this.gp1.makePowered();
+
+    t.checkExpect(this.gp1.isLit, true);
+  }
+
+  void testMakeSemiPowered(Tester t) {
+    this.initData();
+
+    t.checkExpect(this.gp1.isSemiLit, false);
+
+    this.gp1.makeSemiPowered();
+
+    t.checkExpect(this.gp1.isSemiLit, true);
+  }
+
+  void testMakeBarelyPowered(Tester t) {
+    this.initData();
+
+    t.checkExpect(this.gp1.barelyLit, false);
+
+    this.gp1.makeBarelyPowered();
+
+    t.checkExpect(this.gp1.barelyLit, true);
+  }
+
+  void testMakeUnPowered(Tester t) {
+    this.initData();
+
+    this.gp1.makePowered();
+    this.gp1.makeSemiPowered();
+    this.gp1.makeBarelyPowered();
+
+    t.checkExpect(this.gp1.isLit, true);
+    t.checkExpect(this.gp1.isSemiLit, true);
+    t.checkExpect(this.gp1.barelyLit, true);
+
+    this.gp1.makeUnPowered();
+
+    t.checkExpect(this.gp1.isLit, false);
+    t.checkExpect(this.gp1.isSemiLit, false);
+    t.checkExpect(this.gp1.barelyLit, false);
+
+
+
+  }
+
+  void testSameGamePiece(Tester t) {
+    this.gp1 = new GamePiece(0, 0, true, true, true, true, true, true);
+    this.gp2 = new GamePiece(0, 0, false, true, true, true, true, true);
+
+    t.checkExpect(this.gp1.sameGamePiece(this.gp1), true);
+    t.checkExpect(this.gp1.sameGamePiece(this.gp2), false);
+    t.checkExpect(this.gp2.sameGamePiece(this.gp1), false);
+
+    this.gp1.makeUnPowered();
+
+    t.checkExpect(this.gp1.sameGamePiece(this.gp1), true);
+    t.checkExpect(this.gp1.sameGamePiece(new GamePiece(0, 0, true, true, true, true, true, true)),
+        false);
+
+
+  }
+
+
+  void testRotate(Tester t) {
+    this.initData();
+    this.gp5.left = true;  
+    this.gp5.rotate();
+    t.checkExpect(this.gp5.left, false);
+    t.checkExpect(this.gp5.top, true);
+    this.gp5.rotate();
+    t.checkExpect(this.gp5.top, false);
+    t.checkExpect(this.gp5.right, true);
+    this.gp5.rotate();
+    t.checkExpect(this.gp5.right, false);
+    t.checkExpect(this.gp5.bottom, true);
+    this.gp5.rotate();
+    t.checkExpect(this.gp5.bottom, false);
+    t.checkExpect(this.gp5.left, true);
+
+    this.gp5.top = true;
+    this.gp5.rotate();
+    t.checkExpect(this.gp5.left, false);
+    t.checkExpect(this.gp5.top, true);
+    t.checkExpect(this.gp5.right, true);
+    this.gp5.rotate();
+    t.checkExpect(this.gp5.top, false);
+    t.checkExpect(this.gp5.right, true);
+    t.checkExpect(this.gp5.bottom, true);
+    this.gp5.rotate();
+    t.checkExpect(this.gp5.right, false);
+    t.checkExpect(this.gp5.bottom, true);
+    t.checkExpect(this.gp5.left, true);
+    this.gp5.rotate();
+    t.checkExpect(this.gp5.bottom, false);
+    t.checkExpect(this.gp5.left, true);
+    t.checkExpect(this.gp5.top, true);
+
+    this.gp5.right = true;
+    this.gp5.bottom = true;
+
+    this.gp5.rotate();
+    this.gp5.rotate();
+    t.checkExpect(this.gp5.left, true);
+    t.checkExpect(this.gp5.top, true);
+    t.checkExpect(this.gp5.right, true);
+    t.checkExpect(this.gp5.bottom, true);
+
+
+  }
+
+  void testRotateRandomAmount(Tester t) {
+    this.initData();
+    this.gp5.random = new Random(5);
+    this.gp5.left = true;
+    this.gp5.rotateRandomAmount();
+
+    t.checkExpect(this.gp5.left, false);
+    t.checkExpect(this.gp5.right, true);
+    t.checkExpect(this.gp5.top, false);
+    t.checkExpect(this.gp5.bottom, false);
+
+    this.initData();
+    this.gp5.random = new Random(39);
+    this.gp5.top = true;
+    this.gp5.rotateRandomAmount();
+
+    t.checkExpect(this.gp5.left, false);
+    t.checkExpect(this.gp5.right, false);
+    t.checkExpect(this.gp5.top, false);
+    t.checkExpect(this.gp5.bottom, true);
+
+  }
+
+  void testCreateBoard(Tester t) {
+    this.initData();
+    this.lightEmAllEx.createBoard();
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(0), this.gp1);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(1), new GamePiece(1, 0));
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(0), new GamePiece(0, 1));
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(1), new GamePiece(1, 1));
+  }
+
+  void testDrawAllGrids(Tester t) {
+    this.initData();
+    this.lightEmAllEx.createBoard();
+    WorldScene s = new WorldScene(600, 600);
+
+    s.placeImageXY(new RectangleImage(10, 10, OutlineMode.OUTLINE, Color.BLACK), 5, 5);
+    s.placeImageXY(new RectangleImage(10, 10, OutlineMode.OUTLINE, Color.BLACK), 15, 5);
+    s.placeImageXY(new RectangleImage(10, 10, OutlineMode.OUTLINE, Color.BLACK), 5, 15);
+    s.placeImageXY(new RectangleImage(10, 10, OutlineMode.OUTLINE, Color.BLACK), 15, 15);
+
+    t.checkExpect(this.lightEmAllEx.drawAllGrids(10, 10, new WorldScene(600, 600)), s); 
+
+    this.initData();
+    this.lightEmAllEx.createBoard();
+    this.lightEmAllEx.board.get(0).get(0).left = true;
+
+    WorldScene s2 = new WorldScene(600, 600);
+
+    s2.placeImageXY(new OverlayImage(new RotateImage(new LineImage(
+        new Posn(0, 5), Color.BLUE).movePinhole(0, -2), 90),
+        new RectangleImage(10, 10, OutlineMode.OUTLINE, Color.black)), 5, 5);
+    s2.placeImageXY(new RectangleImage(10, 10, OutlineMode.OUTLINE, Color.BLACK), 15, 5);
+    s2.placeImageXY(new RectangleImage(10, 10, OutlineMode.OUTLINE, Color.BLACK), 5, 15);
+    s2.placeImageXY(new RectangleImage(10, 10, OutlineMode.OUTLINE, Color.BLACK), 15, 15);
+
+    t.checkExpect(this.lightEmAllEx.drawAllGrids(10, 10, new WorldScene(600, 600)), s2);
+
+    this.initData();
+    this.lightEmAllEx.createBoard();
+    this.lightEmAllEx.board.get(0).get(0).left = true;
+    this.lightEmAllEx.board.get(1).get(0).right = true;
+
+    WorldScene s3 = new WorldScene(600, 600);
+
+    s3.placeImageXY(new OverlayImage(new RotateImage(new LineImage(
+        new Posn(0, 5), Color.BLUE).movePinhole(0, -2), 90),
+        new RectangleImage(10, 10, OutlineMode.OUTLINE, Color.black)), 5, 5);
+    s3.placeImageXY(new RectangleImage(10, 10, OutlineMode.OUTLINE, Color.BLACK), 5, 15);
+    s3.placeImageXY(new OverlayImage(new RotateImage(new LineImage(
+        new Posn(0, 5), Color.GRAY).movePinhole(0, -2), 270),
+        new RectangleImage(10, 10, OutlineMode.OUTLINE, Color.black)), 15, 5);
+    s3.placeImageXY(new RectangleImage(10, 10, OutlineMode.OUTLINE, Color.BLACK), 15, 15);
+
+    t.checkExpect(this.lightEmAllEx.drawAllGrids(10, 10, new WorldScene(600, 600)), s3); 
+
+
+  }
+
+  void testShuffle(Tester t) {
+    this.initData();
+
+    this.lightEmAllEx.createBoard();
+
+
+    this.lightEmAllEx.board.get(0).get(0).random = new Random(5);
+    this.lightEmAllEx.board.get(0).get(0).hasLeftNow();
+
+    this.lightEmAllEx.board.get(0).get(1).random = new Random(4);
+    this.lightEmAllEx.board.get(0).get(1).hasLeftNow();
+    this.lightEmAllEx.board.get(0).get(1).hasRightNow();
+    this.lightEmAllEx.board.get(0).get(1).hasTopNow();
+
+    this.lightEmAllEx.board.get(1).get(0).hasLeftNow();
+    this.lightEmAllEx.board.get(1).get(0).random = new Random(3);
+
+    this.lightEmAllEx.board.get(1).get(1).random = new Random(2);
+    this.lightEmAllEx.board.get(1).get(1).hasLeftNow();
+    this.lightEmAllEx.board.get(1).get(1).hasRightNow();
+    this.lightEmAllEx.board.get(1).get(1).hasTopNow();
+    this.lightEmAllEx.board.get(1).get(1).hasBottomNow();
+
+
+    this.lightEmAllEx.shuffle();
+
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(0).bottom, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(0).top, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(0).left, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(0).right, true);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(0).bottom, false);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(0).top, false);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(0).left, false);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(0).right, true);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(1).bottom, true);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(1).top, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(1).left, true);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(1).right, true);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(1).bottom, true);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(1).top, true);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(1).left, true);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(1).right, true); 
+
+  }
+
+
+  void testGetCorrespondingPiece(Tester t) {
+    this.initData();
+    this.lightEmAllEx.createBoard();
+
+    this.gp1 = this.lightEmAllEx.board.get(0).get(0);
+    this.gp2 = this.lightEmAllEx.board.get(1).get(0);
+    this.gp3 = this.lightEmAllEx.board.get(0).get(1);
+    this.gp4 = this.lightEmAllEx.board.get(1).get(1);
+
+    t.checkExpect(this.lightEmAllEx.getCorrespondingPiece(0, 0), this.gp1);
+    t.checkExpect(this.lightEmAllEx.getCorrespondingPiece(0, 1), this.gp3);
+    t.checkExpect(this.lightEmAllEx.getCorrespondingPiece(1, 0), this.gp2);
+    t.checkExpect(this.lightEmAllEx.getCorrespondingPiece(1, 1), this.gp4);
+
+  }
+
+  void testConnectEdgePieces(Tester t) {
+    this.initData();
+
+    this.lightEmAllEx.connectEdgePieces(this.e1);
+
+    t.checkExpect(this.gp1.right, true);
+    t.checkExpect(this.gp1.left, true);
+    t.checkExpect(this.gp1.bottom, true);
+    t.checkExpect(this.gp1.top, true);
+
+    this.initData();
+
+    this.gp2.row = 18;
+    this.gp2.col = 18;
+
+    this.e1 = new Edge(this.gp1, this.gp2, 0);
+
+    this.lightEmAllEx.connectEdgePieces(this.e1);
+
+    t.checkExpect(this.gp1.right, false);
+    t.checkExpect(this.gp1.left, false);
+    t.checkExpect(this.gp1.bottom, false);
+    t.checkExpect(this.gp1.top, false);
+
+  }
+
+  void testSwapEdges(Tester t) {
+    this.initData();
+
+    ArrayList<Edge> edges = new ArrayList<Edge>(Arrays.asList(this.e1, this.e2));
+
+    this.lightEmAllEx.swapEdges(edges, 0, 1);
+
+    t.checkExpect(edges.get(0), this.e2);
+    t.checkExpect(edges.get(1), this.e1);
+
+
+  }
+
+  void testCheckWithinBoundaries(Tester t) {
+    this.initData();
+
+    this.lightEmAllEx.width = 600;
+    this.lightEmAllEx.height = 600;
+
+    t.checkExpect(this.lightEmAllEx.checkWithinBoundaries(-1, -1), false);
+    t.checkExpect(this.lightEmAllEx.checkWithinBoundaries(0, 0), true);
+    t.checkExpect(this.lightEmAllEx.checkWithinBoundaries(599, 599), true);
+    t.checkExpect(this.lightEmAllEx.checkWithinBoundaries(600, 600), false);
+    t.checkExpect(this.lightEmAllEx.checkWithinBoundaries(601, 601), false);
+
+  }
+
+  void testOnTick(Tester t) {
+    this.initData();
+    this.lightEmAllEx.counter = 0;
+
+    this.lightEmAllEx.onTick();
+
+    t.checkExpect(this.lightEmAllEx.counter, 1);
+
+    this.lightEmAllEx.onTick();
+
+    t.checkExpect(this.lightEmAllEx.counter, 2);
+  }
+
+  void testClearBoard(Tester t) {
+    this.initData();
+
+    this.lightEmAllEx.createBoard();
+    this.lightEmAllEx.clearBoard();
+
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(0).left, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(0).right, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(0).top, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(0).bottom, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(0).powerStation, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(0).isLit, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(0).isSemiLit, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(0).barelyLit, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(1).left, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(1).right, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(1).top, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(1).bottom, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(1).powerStation, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(1).isLit, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(1).isSemiLit, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(1).barelyLit, false);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(0).left, false);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(0).right, false);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(0).top, false);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(0).bottom, false);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(0).powerStation, false);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(0).isLit, false);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(0).isSemiLit, false);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(0).barelyLit, false);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(1).left, false);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(1).right, false);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(1).top, false);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(1).bottom, false);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(1).powerStation, false);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(1).isLit, false);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(1).isSemiLit, false);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(1).barelyLit, false);
+  }
+
+
+  void testMakeScene(Tester t) {
+    this.initData();
+
+    this.lightEmAllEx.createBoard();
+    WorldScene scene = this.lightEmAllEx.getEmptyScene();
+
+    scene.placeImageXY(new RectangleImage(10, 10, OutlineMode.OUTLINE, Color.BLACK), 5, 5);
+    scene.placeImageXY(new RectangleImage(10, 10, OutlineMode.OUTLINE, Color.BLACK), 15, 5);
+    scene.placeImageXY(new RectangleImage(10, 10, OutlineMode.OUTLINE, Color.BLACK), 5, 15);
+    scene.placeImageXY(new RectangleImage(10, 10, OutlineMode.OUTLINE, Color.BLACK), 15, 15);
+
+    t.checkExpect(this.lightEmAllEx.makeScene(), scene);
+
+    this.initData();
+    this.lightEmAllEx.createBoard();
+    WorldScene scene2 = this.lightEmAllEx.getEmptyScene();
+    this.lightEmAllEx.board.get(0).get(0).left = true;
+
+    scene2.placeImageXY(new OverlayImage(new RotateImage(new LineImage(
+        new Posn(0, 5), Color.GRAY).movePinhole(0, -2), 90),
+        new RectangleImage(10, 10, OutlineMode.OUTLINE, Color.black)), 5, 5);
+    scene2.placeImageXY(new RectangleImage(10, 10, OutlineMode.OUTLINE, Color.BLACK), 15, 5);
+    scene2.placeImageXY(new RectangleImage(10, 10, OutlineMode.OUTLINE, Color.BLACK), 5, 15);
+    scene2.placeImageXY(new RectangleImage(10, 10, OutlineMode.OUTLINE, Color.BLACK), 15, 15);
+
+    t.checkExpect(this.lightEmAllEx.makeScene(), scene2);
+
+  }
+
+  void testOnMouseClicked(Tester t) {
+    this.initData();  
+    this.lightEmAllEx.createBoard();
+    this.lightEmAllEx.getCorrespondingPiece(0, 0).hasBottomNow();
+    this.lightEmAllEx.onMouseClicked(this.p1);
+
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(0).left, true);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(0).right, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(0).bottom, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(0).top, false);
+    t.checkExpect(this.lightEmAllEx.mouseClick, 1);
+
+    this.lightEmAllEx.onMouseClicked(this.p1);
+
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(0).left, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(0).right, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(0).bottom, false);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(0).top, true);
+    t.checkExpect(this.lightEmAllEx.mouseClick, 2);
+
+    this.initData();  
+    this.lightEmAllEx.createBoard();
+    this.lightEmAllEx.getCorrespondingPiece(1, 1).hasBottomNow();
+    this.lightEmAllEx.getCorrespondingPiece(1, 1).hasTopNow();
+    this.lightEmAllEx.getCorrespondingPiece(1, 1).hasLeftNow();
+
+    this.lightEmAllEx.onMouseClicked(this.p2);
+
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(1).left, true);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(1).right, true);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(1).bottom, false);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(1).top, true);
+    t.checkExpect(this.lightEmAllEx.mouseClick, 1);
+
+    this.lightEmAllEx.onMouseClicked(this.p2);
+
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(1).left, false);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(1).right, true);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(1).bottom, true);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(1).top, true);
+    t.checkExpect(this.lightEmAllEx.mouseClick, 2);
+
+
+  }
+
+  void testOnKeyEvent(Tester t) {
+    this.initData();
+
+    this.lightEmAllEx.createBoard();
+    this.lightEmAllEx.board.get(0).get(0).hasBottomNow();
+    this.lightEmAllEx.board.get(1).get(0).hasBottomNow();
+    this.lightEmAllEx.board.get(0).get(1).hasTopNow();
+    this.lightEmAllEx.board.get(0).get(1).hasRightNow();
+    this.lightEmAllEx.board.get(1).get(1).hasLeftNow();
+    this.lightEmAllEx.board.get(1).get(1).hasTopNow();
+    this.lightEmAllEx.board.get(1).get(0).hasPowerStation();
+
+    this.lightEmAllEx.onKeyEvent("down");
+    t.checkExpect(this.lightEmAllEx.powerRow, 1);
+    this.lightEmAllEx.onKeyEvent("left");
+    t.checkExpect(this.lightEmAllEx.powerCol, 0);
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(1).powerStation, true);
+    this.lightEmAllEx.onKeyEvent("right");
+    t.checkExpect(this.lightEmAllEx.powerCol, 1);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(1).powerStation, true);
+    this.lightEmAllEx.onKeyEvent("up");
+    t.checkExpect(this.lightEmAllEx.powerRow, 0);
+    t.checkExpect(this.lightEmAllEx.board.get(1).get(0).powerStation, true);
+
+    this.initData();
+    this.lightEmAllEx = new LightEmAll(2, 2);
+    this.lightEmAllEx.onKeyEvent("r");
+    t.checkExpect(this.lightEmAllEx.counter, 0);
+    t.checkExpect(this.lightEmAllEx.mouseClick, 0);
+  }
+
+  void testSetNodesForGame(Tester t) {
+    this.lightEmAllEx = new LightEmAll(2, 2);
+
+    t.checkExpect(this.lightEmAllEx.nodes, new ArrayList<GamePiece>(Arrays.asList(
+        this.lightEmAllEx.board.get(0).get(0), this.lightEmAllEx.board.get(0).get(1),
+        this.lightEmAllEx.board.get(1).get(0), this.lightEmAllEx.board.get(1).get(1))));
+  }
+
+  void testSetRadiusToGraphDiameter(Tester t) {
+    this.initData();
+    this.lightEmAllEx.createBoard();
+
+    this.lightEmAllEx.board.get(0).get(0).hasBottomNow();
+    this.lightEmAllEx.board.get(0).get(0).hasPowerStation();
+    this.lightEmAllEx.board.get(0).get(1).hasTopNow();
+    this.lightEmAllEx.board.get(0).get(1).hasRightNow();
+    this.lightEmAllEx.board.get(1).get(0).hasBottomNow();
+    this.lightEmAllEx.board.get(1).get(1).hasTopNow();
+    this.lightEmAllEx.board.get(1).get(1).hasLeftNow();
+
+    this.lightEmAllEx.setRadiusToGraphDiameter();
+
+    t.checkExpect(this.lightEmAllEx.radius, 2);
+  }
+
+  void testBFSCountsDepth(Tester t) {
+    this.initData();
+    this.lightEmAllEx.createBoard();
+
+    this.lightEmAllEx.board.get(0).get(0).hasBottomNow();
+    this.lightEmAllEx.board.get(0).get(0).hasPowerStation();
+    this.lightEmAllEx.board.get(0).get(1).hasTopNow();
+    this.lightEmAllEx.board.get(0).get(1).hasRightNow();
+    this.lightEmAllEx.board.get(1).get(0).hasBottomNow();
+    this.lightEmAllEx.board.get(1).get(1).hasTopNow();
+    this.lightEmAllEx.board.get(1).get(1).hasLeftNow();
+
+    t.checkExpect(this.lightEmAllEx.bfsCountsDepth(this.lightEmAllEx.board.get(0).get(0),
+        this.lightEmAllEx.board.get(1).get(0), new ArrayList<GamePiece>()), 3);
+  }
+
+  void testBFSGettingFurthest(Tester t) {
+    this.initData();
+    this.lightEmAllEx.createBoard();
+
+    this.lightEmAllEx.board.get(0).get(0).hasBottomNow();
+    this.lightEmAllEx.board.get(0).get(0).hasPowerStation();
+    this.lightEmAllEx.board.get(0).get(1).hasTopNow();
+    this.lightEmAllEx.board.get(0).get(1).hasRightNow();
+    this.lightEmAllEx.board.get(1).get(0).hasBottomNow();
+    this.lightEmAllEx.board.get(1).get(1).hasTopNow();
+    this.lightEmAllEx.board.get(1).get(1).hasLeftNow();
+
+    t.checkExpect(this.lightEmAllEx.bfsGettingFurthest(this.lightEmAllEx.board.get(0).get(0)),
+        this.lightEmAllEx.board.get(1).get(0));
+  }
+
+  void testConnectedGamePieces(Tester t) {
+    this.initData();
+    this.lightEmAllEx.createBoard();
+
+    this.lightEmAllEx.board.get(0).get(0).hasBottomNow();
+    this.lightEmAllEx.board.get(0).get(0).hasPowerStation();
+    this.lightEmAllEx.board.get(0).get(1).hasTopNow();
+    this.lightEmAllEx.board.get(0).get(1).hasRightNow();
+    this.lightEmAllEx.board.get(1).get(0).hasBottomNow();
+    this.lightEmAllEx.board.get(1).get(1).hasTopNow();
+    this.lightEmAllEx.board.get(1).get(1).hasLeftNow();
+
+    t.checkExpect(this.lightEmAllEx.connectedGamePieces(this.lightEmAllEx.board.get(0).get(0),
+        new ArrayList<GamePiece>()), new ArrayList<GamePiece>(Arrays.asList(
+            this.lightEmAllEx.getCorrespondingPiece(0, 1))));
+  }
+
+  // Tests for the methods KruskalBoard, constructEdgeList, minimumSpanningTree,
+  // putRepresentatives, getRepresentatives, heapSort, and heapSortHelp
+  void testKruskalMethods(Tester t) {
+    this.initData();
+    this.lightEmAllEx = new LightEmAll(2, 2, 0);
+
+    // checks that the power station is set up correctly
+    t.checkExpect(this.lightEmAllEx.board.get(0).get(0).powerStation, true);
+
+    // if all of the Kruskal algorithm methods have been performed correctly, then, for a 
+    // 2 by 2 board, the board must look like a U in some way
+    t.checkExpect(this.lightEmAllEx.isShapedLikeU(), true);
+
+  }
+
+  void testCheckWin(Tester t) {
+    this.initData();
+
+    this.lightEmAllEx.createBoard();
+    t.checkExpect(this.lightEmAllEx.checkWin(), false);
+
+    this.lightEmAllEx.board.get(0).get(0).makePowered();
+    this.lightEmAllEx.board.get(0).get(1).makePowered();
+    this.lightEmAllEx.board.get(1).get(0).makeSemiPowered();
+    this.lightEmAllEx.board.get(1).get(1).makeBarelyPowered();
+
+    t.checkExpect(this.lightEmAllEx.checkWin(), true);
+
+  }
+
+  void testGameWin(Tester t) {
+    this.initData();
+
+    this.lightEmAllEx.createBoard();
+    WorldScene scene = this.lightEmAllEx.getEmptyScene();
+
+    scene.placeImageXY(
+        new RectangleImage(600, 600, OutlineMode.SOLID, Color.DARK_GRAY), 300, 300);
+
+    scene = this.lightEmAllEx.drawAllGrids(300, 300, scene);
+
+    scene.placeImageXY(new TextImage("YOU WIN! Number of Clicks Taken:0 Time taken: 0 seconds",
+        Color.GREEN), 300, 300);
+
+    t.checkExpect(this.lightEmAllEx.gameWin(), scene);
+  }
+
+  void testWorldEnds(Tester t) {
+    this.initData();
+    this.lightEmAllEx.createBoard();
+    t.checkExpect(this.lightEmAllEx.worldEnds(), new WorldEnd(false,
+        this.lightEmAllEx.makeScene()));
+
+    this.lightEmAllEx.board.get(0).get(0).makePowered();
+    this.lightEmAllEx.board.get(0).get(1).makePowered();
+    this.lightEmAllEx.board.get(1).get(0).makeSemiPowered();
+    this.lightEmAllEx.board.get(1).get(1).makeBarelyPowered();
+
+    t.checkExpect(this.lightEmAllEx.worldEnds(), new WorldEnd(true,
+        this.lightEmAllEx.gameWin()));
+  }
+
+  void testAddAtBack(Tester t) {
+    this.initData();
+
+    this.arrayQueue.addAtBack(0);
+
+    t.checkExpect(this.arrayQueue.array.contains(0), true);
+    t.checkExpect(this.arrayQueue.array, new ArrayList<Integer>(Arrays.asList(1, 0)));
+  }
+
+  void testAddAll(Tester t) {
+    this.initData();
+
+    this.arrayQueue.addAll(new ArrayList<Integer>(Arrays.asList(2, 3)));
+
+    t.checkExpect(this.arrayQueue.array.contains(2), true);
+    t.checkExpect(this.arrayQueue.array.contains(3), true);
+    t.checkExpect(this.arrayQueue.array, new ArrayList<Integer>(Arrays.asList(1, 2, 3)));
+  }
+
+  void testSize(Tester t) {
+    this.initData();
+
+    t.checkExpect(this.arrayQueue.size(), 1);
+
+    this.arrayQueue.addAtBack(0);
+
+    t.checkExpect(this.arrayQueue.size(), 2);
+
+  }
+
+  void testRemoveFromFront(Tester t) {
+    this.initData();
+
+    t.checkExpect(this.arrayQueue.removeFromFront(), 1);
+
+    this.initData();
+
+    this.arrayQueue.addAll(new ArrayList<Integer>(Arrays.asList(2, 3)));
+
+    t.checkExpect(this.arrayQueue.removeFromFront(), 1);
+
+
+  }
+
+
+
+}
+
